@@ -1,35 +1,35 @@
 package ssdblib
 
 import (
+	"errors"
 	"github.com/seefan/gossdb"
 	"regexp"
 	"strings"
 	"time"
-	"errors"
 )
 
 type SSDBBinLog struct {
-	Capacity	string
-	MinSeq		string
-	MaxSeq		string
+	Capacity string
+	MinSeq   string
+	MaxSeq   string
 }
 
 type SSDBReplSlave struct {
-	Id 			string
-	Type 		string
-	Status 		string
-	LastSeq 	string
-	CopyCount	string
-	SyncCount	string
+	Id        string
+	Type      string
+	Status    string
+	LastSeq   string
+	CopyCount string
+	SyncCount string
 }
 
 type SSDBInfo struct {
-	Version			string
-	Links 			string
-	TotalCalls 		string
-	DBSize          string
-	BinLog          SSDBBinLog
-	Replication		map[string]SSDBReplSlave
+	Version     string
+	Links       string
+	TotalCalls  string
+	DBSize      string
+	BinLog      SSDBBinLog
+	Replication map[string]SSDBReplSlave
 }
 
 type Client struct {
@@ -38,19 +38,19 @@ type Client struct {
 
 func tryConnect(Host string, Port int, Timeout int) (*gossdb.Connectors, error) {
 
-	timer := time.NewTimer(time.Duration(Timeout) * time.Second) 
-    defer timer.Stop() 
+	timer := time.NewTimer(time.Duration(Timeout) * time.Second)
+	defer timer.Stop()
 
-    type Result struct { 
-        *gossdb.Connectors 
-        error 
-    } 
+	type Result struct {
+		*gossdb.Connectors
+		error
+	}
 
-	channel := make(chan *Result, 1) 
+	channel := make(chan *Result, 1)
 
-	go func() { 
-		var err error 
-        var ssdbPool *gossdb.Connectors
+	go func() {
+		var err error
+		var ssdbPool *gossdb.Connectors
 
 		ssdbPool, err = gossdb.NewPool(&gossdb.Config{
 			Host:             Host,
@@ -67,19 +67,19 @@ func tryConnect(Host string, Port int, Timeout int) (*gossdb.Connectors, error) 
 		if err != nil {
 			goto finished
 		}
-	finished: 
-        channel <- &Result{Connectors: ssdbPool, error: err} 
-    }()
+	finished:
+		channel <- &Result{Connectors: ssdbPool, error: err}
+	}()
 
-    select { 
-    case <-timer.C: 
-        return nil, errors.New("Connection timeout!") 
-    case result := <-channel: 
-        if result.error != nil { 
-            return nil, result.error 
-        } 
-        return result.Connectors, nil 
-    } 
+	select {
+	case <-timer.C:
+		return nil, errors.New("Connection timeout!")
+	case result := <-channel:
+		if result.error != nil {
+			return nil, result.error
+		}
+		return result.Connectors, nil
+	}
 }
 
 func Init(Host string, Port int) (*Client, error) {
@@ -116,10 +116,10 @@ func (c *Client) Info() (*SSDBInfo, error) {
 	status := new(SSDBInfo)
 
 	if len(resp) > 1 && resp[0] == "ok" {
-		status.Version 	= resp[3]
-		status.Links 	= resp[5]
+		status.Version = resp[3]
+		status.Links = resp[5]
 		status.TotalCalls = resp[7]
-		status.DBSize 	  = resp[9]
+		status.DBSize = resp[9]
 
 		info := strings.Join(resp[1:], "\n")
 
@@ -131,32 +131,38 @@ func (c *Client) Info() (*SSDBInfo, error) {
 		BinLog := new(SSDBBinLog)
 
 		BinLog.Capacity = list[0][2]
-		BinLog.MinSeq 	= list[1][2]
-		BinLog.MaxSeq	= list[2][2]
+		BinLog.MinSeq = list[1][2]
+		BinLog.MaxSeq = list[2][2]
 
 		status.BinLog = *BinLog
 
-		lastKey  := ""
+		lastKey := ""
 		ReplInfo := new(SSDBReplSlave)
 
 		status.Replication = make(map[string]SSDBReplSlave)
 
-		for _,v := range list {
+		for _, v := range list {
 			if v[1] == "slaveof" {
 				lastKey = strings.Split(v[2], ":")[0]
 				ReplInfo = new(SSDBReplSlave)
 			} else {
 				if lastKey != "" {
-						switch v[1] {
-							case "id": 			ReplInfo.Id = v[2]
-							case "type": 		ReplInfo.Type = v[2]
-							case "status": 		ReplInfo.Status = v[2]
-							case "last_seq": 	ReplInfo.LastSeq = v[2]
-							case "copy_count": 	ReplInfo.CopyCount = v[2]
-							case "sync_count": 	ReplInfo.SyncCount = v[2]
-												status.Replication[lastKey] = *ReplInfo
-												lastKey = ""	
-						}
+					switch v[1] {
+					case "id":
+						ReplInfo.Id = v[2]
+					case "type":
+						ReplInfo.Type = v[2]
+					case "status":
+						ReplInfo.Status = v[2]
+					case "last_seq":
+						ReplInfo.LastSeq = v[2]
+					case "copy_count":
+						ReplInfo.CopyCount = v[2]
+					case "sync_count":
+						ReplInfo.SyncCount = v[2]
+						status.Replication[lastKey] = *ReplInfo
+						lastKey = ""
+					}
 				}
 			}
 		}
