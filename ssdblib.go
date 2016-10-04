@@ -106,6 +106,14 @@ func Init(Host string, Port int) (*Client, error) {
 	return cl, nil
 }
 
+func (c *Client) Get(key string) (gossdb.Value, error) {
+	return c.Get(key)
+}
+
+func (c *Client) Set(key string, val interface{}) (error) {
+	return c.Set(key, val)
+}
+
 func (c *Client) Info() (*SSDBInfo, error) {
 
 	resp, err := c.Do("info")
