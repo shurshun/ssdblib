@@ -30,6 +30,7 @@ type SSDBInfo struct {
 	DBSize      string
 	BinLog      SSDBBinLog
 	Replication map[string]SSDBReplSlave
+	Clients 	int
 }
 
 type Client struct {
@@ -106,17 +107,9 @@ func Init(Host string, Port int) (*Client, error) {
 	return cl, nil
 }
 
-func (c *Client) Get(key string) (gossdb.Value, error) {
-	return c.Get(key)
-}
-
-func (c *Client) Set(key string, val interface{}) (error) {
-	return c.Set(key, val)
-}
-
 func (c *Client) Info() (*SSDBInfo, error) {
-
 	resp, err := c.Do("info")
+	
 	if err != nil {
 		return nil, err
 	}
@@ -128,6 +121,7 @@ func (c *Client) Info() (*SSDBInfo, error) {
 		status.Links = resp[5]
 		status.TotalCalls = resp[7]
 		status.DBSize = resp[9]
+		status.Clients = 0
 
 		info := strings.Join(resp[1:], "\n")
 
@@ -150,6 +144,9 @@ func (c *Client) Info() (*SSDBInfo, error) {
 		status.Replication = make(map[string]SSDBReplSlave)
 
 		for _, v := range list {
+			if v[1] == "client" {
+				status.Clients++
+			}
 			if v[1] == "slaveof" {
 				lastKey = strings.Split(v[2], ":")[0]
 				ReplInfo = new(SSDBReplSlave)
